@@ -20,9 +20,9 @@ describe('FundMe', () => {
     });
     describe('constructor', () => {
         it('sets the aggregator address correctly', async () => {
-            const priceFeedAddress = await fundMe.priceFeed();
+            const s_priceFeedAddress = await fundMe.getPriceFeed();
             const aggreatorAddress = await mockV3Aggregator.getAddress();
-            expect(priceFeedAddress).equal(aggreatorAddress);
+            expect(s_priceFeedAddress).equal(aggreatorAddress);
         });
     });
 
@@ -36,14 +36,16 @@ describe('FundMe', () => {
             await fundMe.fund({
                 value: sendValue,
             });
-            const res = await fundMe.addressToAmountFunded(deployer.address);
+            const res = await fundMe.getAddressToAmountFounded(
+                deployer.address,
+            );
             expect(res).equal(sendValue);
         });
-        it('records funder to array of funders', async () => {
+        it('records funder to array of getFunder', async () => {
             await fundMe.fund({
                 value: sendValue,
             });
-            const funder = await fundMe.funders(0);
+            const funder = await fundMe.getFunder(0);
             expect(funder).equal(deployer.address);
         });
     });
@@ -106,10 +108,87 @@ describe('FundMe', () => {
                 // @ts-ignore
                 curDeployerBalance + gasCost,
             );
-            await expect(fundMe.funders(0)).to.be.reverted;
+            await expect(fundMe.getFunder(0)).to.be.reverted;
             for (let i = 1; i < 6; i++) {
                 expect(
-                    await fundMe.addressToAmountFunded(accounts[i].address),
+                    await fundMe.getAddressToAmountFounded(accounts[i].address),
+                ).equal(0);
+            }
+        });
+        it('only allows the owner to withdraw', async () => {
+            const accounts = await ethers.getSigners();
+            const attacker = accounts[1];
+            const connectedContract = await fundMe.connect(attacker);
+            await expect(
+                connectedContract.withdraw(),
+            ).to.be.revertedWithCustomError(
+                connectedContract,
+                'FundMe__NotOwner',
+            );
+        });
+    });
+    describe('cheaper withdraw', async () => {
+        let contractAddress: Address;
+        beforeEach(async () => {
+            await fundMe.fund({
+                value: sendValue,
+            });
+            contractAddress = await fundMe.getAddress();
+        });
+        it('withdraw ETH from a single founder', async () => {
+            const provider = ethers.provider;
+            const preContractBalance =
+                await provider.getBalance(contractAddress);
+            const preDeployerBalance = await provider.getBalance(
+                deployer.address,
+            );
+            const transcation = await fundMe.cheaperWithdraw();
+            const transcationRecepit = await transcation.wait(1);
+            // @ts-ignore
+            const { gasUsed, gasPrice } = transcationRecepit;
+            const gasCost = gasPrice * gasUsed;
+            const curContractBalance =
+                await provider.getBalance(contractAddress);
+            const curFunderBalance = await provider.getBalance(
+                deployer.address,
+            );
+            expect(curContractBalance).equal(0);
+            expect(preContractBalance + preDeployerBalance).equal(
+                // @ts-ignore
+                curFunderBalance + gasCost,
+            );
+        });
+        it('withdraw ETH from multiple founders', async () => {
+            const provider = ethers.provider;
+            const accounts = await ethers.getSigners();
+            for (let i = 1; i < 6; i++) {
+                const connectedContract = await fundMe.connect(accounts[i]);
+                await connectedContract.fund({ value: sendValue });
+            }
+            const preContractBalance =
+                await provider.getBalance(contractAddress);
+            const preDeployerBalance = await provider.getBalance(
+                deployer.address,
+            );
+            const transcation = await fundMe.cheaperWithdraw();
+            const transcationRecepit = await transcation.wait(1);
+            // @ts-ignore
+            const { gasUsed, gasPrice } = transcationRecepit;
+            const gasCost = gasPrice * gasUsed;
+            const curContractBalance =
+                await provider.getBalance(contractAddress);
+            const curDeployerBalance = await provider.getBalance(
+                deployer.address,
+            );
+            expect(curContractBalance).equal(0);
+            expect(preContractBalance + preDeployerBalance).equal(
+                // @ts-ignore
+                curDeployerBalance + gasCost,
+            );
+            await expect(fundMe.getFunder(0)).to.be.reverted;
+            for (let i = 1; i < 6; i++) {
+                expect(
+                    await fundMe.getAddressToAmountFounded(accounts[i].address),
                 ).equal(0);
             }
         });

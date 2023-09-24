@@ -33,6 +33,7 @@ const config: HardhatUserConfig = {
         coinmarketcap: process.env.COINMARKET_API_KEY,
         outputFile: 'gas-report.txt',
         noColors: true,
+        token: 'ETH',
     },
     etherscan: {
         // Your API key for Etherscan
