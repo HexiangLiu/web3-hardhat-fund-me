@@ -5,6 +5,7 @@ import 'hardhat-deploy-ethers';
 import '@nomicfoundation/hardhat-toolbox';
 import 'solidity-coverage';
 import 'dotenv/config';
+import 'hardhat-gas-reporter';
 
 const config: HardhatUserConfig = {
     solidity: '0.8.19',
@@ -27,7 +28,7 @@ const config: HardhatUserConfig = {
         },
     },
     gasReporter: {
-        enabled: false,
+        enabled: true,
         currency: 'USD',
         coinmarketcap: process.env.COINMARKET_API_KEY,
         outputFile: 'gas-report.txt',
